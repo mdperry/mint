@@ -34,12 +34,19 @@ setup_commands = c(
 	sprintf('mkdir projects/%s/data', project),
 	sprintf('mkdir projects/%s/data/raw_fastqs', project),
 	sprintf('mkdir projects/%s/summary', project),
-	sprintf('mkdir projects/%s/summary/{figures,tables,reports}', project),
+        # This next line was not working as advertised in R 4.0 running on Ubuntu 14.04 LTS, therefore I manually created separate statements
+	# sprintf('mkdir projects/%s/summary/{figures,tables,reports}', project),
+	sprintf('mkdir projects/%s/summary/figures', project),
+	sprintf('mkdir projects/%s/summary/tables', project),
+	sprintf('mkdir projects/%s/summary/reports', project),
 	sprintf('mkdir projects/%s/summary/reports/multiqc', project),
 	sprintf('mkdir projects/%s/%s_hub', project, project),
 	sprintf('mkdir projects/%s/%s_hub/%s', project, project, genome),
 	sprintf('mkdir projects/%s/classifications', project),
-	sprintf('mkdir projects/%s/classifications/{simple,sample}', project),
+        # This next line was also not working as advertised in R 4.0 running on Ubuntu 14.04 LTS, therefore I manually created separate statements
+	# sprintf('mkdir projects/%s/classifications/{simple,sample}', project),
+	sprintf('mkdir projects/%s/classifications/simple', project),
+	sprintf('mkdir projects/%s/classifications/sample', project),
 	sprintf('mkdir projects/%s/RData', project)
 )
 
@@ -48,7 +55,13 @@ if(bool_bis_samp) {
 	setup_commands = c(
 		setup_commands,
 		sprintf('mkdir projects/%s/bisulfite', project),
-		sprintf('mkdir projects/%s/bisulfite/{raw_fastqs,raw_fastqcs,trim_fastqs,trim_fastqcs,bismark}', project)
+                # This next line was also not working as advertised in R 4.0 running on Ubuntu 14.04 LTS, therefore I manually created separate statements
+		# sprintf('mkdir projects/%s/bisulfite/{raw_fastqs,raw_fastqcs,trim_fastqs,trim_fastqcs,bismark}', project)
+                sprintf('mkdir projects/%s/bisulfite/raw_fastqs', project),
+                sprintf('mkdir projects/%s/bisulfite/raw_fastqcs', project),
+                sprintf('mkdir projects/%s/bisulfite/trim_fastqs', project),
+                sprintf('mkdir projects/%s/bisulfite/trim_fastqcs', project),
+                sprintf('mkdir projects/%s/bisulfite/bismark', project)
 	)
 }
 # Create folders for bisulfite comparisons if there are any
@@ -63,7 +76,15 @@ if(bool_pull_samp) {
 	setup_commands = c(
 		setup_commands,
 		sprintf('mkdir projects/%s/pulldown', project),
-		sprintf('mkdir projects/%s/pulldown/{raw_fastqs,raw_fastqcs,trim_fastqs,trim_fastqcs,bowtie2_bams,pulldown_coverages,macs2_peaks}', project)
+                # This next line was also not working as advertised in R 4.0 running on Ubuntu 14.04 LTS, therefore I manually created separate statements
+		# sprintf('mkdir projects/%s/pulldown/{raw_fastqs,raw_fastqcs,trim_fastqs,trim_fastqcs,bowtie2_bams,pulldown_coverages,macs2_peaks}', project)
+                sprintf('mkdir projects/%s/pulldown/raw_fastqs', project),
+                sprintf('mkdir projects/%s/pulldown/raw_fastqcs', project),
+                sprintf('mkdir projects/%s/pulldown/trim_fastqs', project),
+                sprintf('mkdir projects/%s/pulldown/trim_fastqcs', project),
+                sprintf('mkdir projects/%s/pulldown/bowtie2_bams', project),
+                sprintf('mkdir projects/%s/pulldown/pulldown_coverages', project),
+                sprintf('mkdir projects/%s/pulldown/macs2_peaks', project)
 	)
 }
 # Create folders for pulldown comparisons if there are any
