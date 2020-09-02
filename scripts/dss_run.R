@@ -1,4 +1,6 @@
 library(optparse)
+# I had to add this statement to get the BioConductor DSS Package and this script to run
+library(methods)
 
 ######
 ###### Options
@@ -47,30 +49,11 @@ interpretation = opt$interpretation
 quiet = opt$quiet
 prefix = opt$outprefix
 
+message('Loading Additional Required Libraries')
+
 library(readr)
 library(DSS)
 library(bsseq)
-
-# project = 'test_hybrid_small'
-# files = 'bisulfite/bismark/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,bisulfite/bismark/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,bisulfite/bismark/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,bisulfite/bismark/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt'
-# sample_names = 'IDH2mut_1,IDH2mut_2,NBM_1,NBM_2'
-# genome = 'hg19'
-#
-# destrand = TRUE
-# tilewidth = 50
-#
-# model = '~group'
-# groups = '1,1,0,0'
-# contrast = '0,1'
-# covariates = 'NA'
-# covIsNumeric = 0
-#
-# methdiffthreshold = 0.05
-# FDRthreshold = 0.05
-# interpretation = 'NBM,IDH2mut'
-#
-# quiet = FALSE
-# prefix = 'IDH2mut_v_NBM_mc_hmc_bisulfite'
 
 ###
 ### Parse arguments
@@ -110,6 +93,8 @@ if(covariates != 'NA') {
 interpretation = unlist(strsplit(interpretation, ','))
 contrast = as.integer(unlist(strsplit(contrast, ',')))
 
+message('Completed Parsing Options')
+
 
 # Need to determine the coefficient of interest from the contrast
 # NOTE: DSS is only able to handle testing if a coefficient is 0 because
@@ -120,6 +105,8 @@ coef = which(contrast == 1)
 ###
 ### Read data and construct combined bsseq object
 ###
+
+message('Starting to Construct the BSseq Object')
 
 data_list = as.list(seq_along(files))
 for(i in seq_along(files)) {
@@ -134,6 +121,8 @@ for(i in seq_along(files)) {
 data = Reduce(combine, data_list)
 rm(data_list)
 
+message('Completed Constructing the BSseq Object')
+
 ###
 ### Destranding
 ###
@@ -142,24 +131,33 @@ if(destrand) {
 	data = strandCollapse(data, shift = TRUE)
 }
 
+message('Completed Destranding')
+
 ###
 ### Tiling
 ###
-
 if(tilewidth != 0) {
+        message('Starting Tiling')
 	tiles = tileGenome(GenomeInfoDb::Seqinfo(genome = genome), tilewidth = tilewidth, cut.last.tile.in.chrom = TRUE)
 
 	tiled_M = getCoverage(data, regions = tiles, what = "perRegionTotal", type = 'M')
 	tiled_M[is.na(tiled_M)] = 0
 	tiled_Cov = getCoverage(data, regions = tiles, what = "perRegionTotal", type = 'Cov')
 	tiled_Cov[is.na(tiled_Cov)] = 0
-
-	data = BSseq(gr = tiles, M = tiled_M, Cov = tiled_Cov, rmZeroCov = TRUE)
-
+        message('Creating BSseq RangedSummarizedExperiment data object where this code from the mint paper used to throw an exception')
+        ## Previous version which caused error:
+	# data = BSseq(gr = tiles, M = tiled_M, Cov = tiled_Cov, rmZeroCov = TRUE) 
+        ## Modification which allows code to execute successfully.  As I recall, there as an error in the bsseq package itself and
+        ## I filed a bug report on the GitHub issues page.  If those developers ever fix that bug, then this line can be
+        ## Changed back to the previous version (in which case subsequent steps may run faster)
+	data = BSseq(gr = tiles, M = tiled_M, Cov = tiled_Cov, rmZeroCov = FALSE)
+        message('Successfully Completed Creating second BSseq data object')
 	rm(tiles)
 	rm(tiled_M)
 	rm(tiled_Cov)
 }
+
+message('Completed Tiling')
 
 ###
 ### Recover difference of methylation averages between groups
@@ -181,6 +179,8 @@ rm(group0_M)
 rm(group1_Cov)
 rm(group0_Cov)
 
+message('Completed Recoving the difference of methylation averages between groups')
+
 ###
 ### Construct design data.frame
 ###
@@ -189,6 +189,8 @@ design = data.frame(group = group)
 if(use_cov) {
 	design = cbind(design, cov_df)
 }
+
+message('Completed Constructing the design data.frame')
 
 ###
 ### Do the fit and test
@@ -212,6 +214,8 @@ result$mu0 = mu0
 result$methdiff = methdiff
 result$direction = ifelse(methdiff < 0, interpretation[1], interpretation[2])
 result = result[!is.na(result$stat),]
+
+message('Completed the fit and test step (whatever that is)')
 
 ###
 ### Prepare for writing
@@ -249,6 +253,8 @@ bedgraph_df$start = format(bedgraph_df$start - 1, scientific = FALSE)
 bedgraph_df$end = format(bedgraph_df$end, scientific = FALSE)
 bedgraph_df = bedgraph_df[, c('chr','start','end','methdiff')]
 
+message('Completed Preparing for Writing')
+
 ######
 ###### Save results meeting FDR threshold
 ######
@@ -270,3 +276,4 @@ write.table(annotatr_df, file = annotatr_file, sep='\t', row.names = FALSE, col.
 message('Saving significant results for bedgraph')
 bedgraph_file = sprintf('bisulfite/dss/%s_dss_for_bigWig.bedGraph', prefix)
 write.table(bedgraph_df, file = bedgraph_file, sep='\t', row.names = FALSE, col.names = FALSE, quote = FALSE)
+message('Completed Running DSS module in the dss_run.R Script')

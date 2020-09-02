@@ -1,4 +1,6 @@
 library(optparse)
+## I had to add this library to get the mint pipeline to run in 2020 on R v 4.0
+library(statmod)
 
 ######
 ###### Options
@@ -66,6 +68,7 @@ prefix = opt$outprefix
 library(csaw)
 library(edgeR)
 
+
 # # Things from opt that are hardcoded right now
 # use_input = TRUE
 #
@@ -101,7 +104,7 @@ library(edgeR)
 ######
 ###### Parse arguments
 ######
-
+message('Starting to parse arguments and options')
 chip_files = unlist(strsplit(chip_files, ','))
 if(use_input) {
 	input_files = unlist(strsplit(input_files, ','))
@@ -140,7 +143,7 @@ if(covariates != 'NA') {
 
 interpretation = unlist(strsplit(interpretation, ','))
 contrast = as.integer(unlist(strsplit(contrast, ',')))
-
+message('Option and Argument parsing completed')
 ######
 ###### Read
 ######
@@ -148,6 +151,7 @@ contrast = as.integer(unlist(strsplit(contrast, ',')))
 # Read all in and create subsets
 message('Reading in all data')
 all = windowCounts(all_files, ext = fragment_length, width = window_width, spacing = window_spacing)
+
 message('Splitting data')
 chip  = all[, seq_along(chip_files)]
 if(use_input) {
@@ -155,34 +159,56 @@ if(use_input) {
 } else {
 	input = NA
 }
-
+message('Completed Reading in and Splitting data')
 ######
 ###### Window filtering with the inputs
 ######
-
+message('Starting to filter windows')
 if(use_input) {
 	message('Determining filtering by input')
 	all_binned = windowCounts(all_files, bin = TRUE, width = 10000)
 	chip_binned = all_binned[, seq_along(chip_files)]
 	input_binned = all_binned[, seq(from = length(chip_files) + 1, to = length(all_files), by = 1)]
+        # previous version throws an exception because filterWindows is now a defunct function
+	# filter_stat = filterWindows(data = chip, background = input, type = 'control', prior.count = prior.count,
+        # 
+        # After reviewing the csaw documentation for the current version of the BioConductor
+        # csaw package I added this new step in the code:
+        scinfo <- scaleControlFilter(chip_binned, input_binned)
 
-	filter_stat = filterWindows(data = chip, background = input, type = 'control', prior.count = prior.count,
-		norm.fac = list(chip_binned, input_binned))
+        # Now this "new" version of the filterWindows step seems to work properly: 
+        filter_stat = filterWindowsControl(chip, input, prior.count = prior.count, scale.info = scinfo)
 
 	keep = (filter_stat$filter > log2(chipfold))
 	chip = chip[keep,]
 }
 
 # Compute normalization
-message('Computing offsetes')
-chip_offsets = normOffsets(chip)
+message('Computing offsets')
+# This statement no longer works as intended in AUG-2020 using R v. 4.0 and the current version of csaw
+# chip_offsets = normOffsets(chip)
 
+# I added this new step, based on my reading of the current csaw documentation
+chip_normfactors = normFactors(chip)
+
+# And then I modified this next function call using the output from the "new" step:
+chip_offsets = normOffsets(chip_normfactors)
+
+
+message('Window filtering completed')
 ######
 ###### Setup data for differential binding test
 ######
 
 message('Converting to DGEList')
-y = asDGEList(chip, norm.factors = chip_offsets, group = groups)
+# This is the original line of code from the mint pipeline publication, it now causes an exception due to modifications
+# in the BioConductor edgeR package:
+# y = asDGEList(chip, norm.factors = chip_offsets, group = groups)
+
+# I used a trial-and-error approach to get this command to finally work in AUG-2020 using R v. 4.0 and the current version of csaw
+y = asDGEList(chip_offsets, group = groups)
+
+
 rownames(y$samples) = chip_names
 colnames(y$counts) = chip_names
 if(use_cov) {
@@ -252,7 +278,12 @@ combined_tests$color = ifelse(combined_tests$logFC < 0, '0,0,255', '102,102,255'
 
 # Make a GRanges with mcols of combined_tests
 combined_gr = merged$region
-mcols(combined_gr) = combined_tests[,c('nWindows', 'logFC.up', 'logFC.down', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
+# The csaw package has changed and not all of these column field names are generated any longer
+# Some of them have been modified, so this step was causing an exception
+# mcols(combined_gr) = combined_tests[,c('nWindows', 'logFC.up', 'logFC.down', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
+
+# This is the new version of the combined_tests function call from AUG-2020 that now "works"
+mcols(combined_gr) = combined_tests[,c('num.tests', 'num.up.logFC', 'num.down.logFC', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
 
 # Convert to a data.frame and create the different variants
 combined_df = data.frame(combined_gr, stringsAsFactors=F)
