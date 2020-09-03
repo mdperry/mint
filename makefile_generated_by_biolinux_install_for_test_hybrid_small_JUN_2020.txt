@@ -1,0 +1,821 @@
+SHELL=/bin/bash
+
+# This makefile was generated using mint v0.4.1
+
+################################################################################
+# Directories
+
+# multiqc directory
+DIR_MULTIQC := summary/reports/multiqc
+
+# tmp directory
+DIR_TMP := tmp/
+
+# bisulfite_align directories
+DIR_BIS_BISMARK := bisulfite/bismark
+DIR_BIS_TRIM_FASTQS := bisulfite/trim_fastqs
+DIR_BIS_TRIM_FASTQCS := bisulfite/trim_fastqcs
+DIR_BIS_RAW_FASTQCS := bisulfite/raw_fastqcs
+DIR_BIS_RAW_FASTQS := bisulfite/raw_fastqs
+
+# bisulfite_compare directories
+DIR_BIS_DSS := bisulfite/dss
+
+# pulldown_align directories
+DIR_PULL_COVERAGES := pulldown/pulldown_coverages
+DIR_PULL_BOWTIE2 := pulldown/bowtie2_bams
+DIR_PULL_TRIM_FASTQS := pulldown/trim_fastqs
+DIR_PULL_TRIM_FASTQCS := pulldown/trim_fastqcs
+DIR_PULL_RAW_FASTQCS := pulldown/raw_fastqcs
+DIR_PULL_RAW_FASTQS := pulldown/raw_fastqs
+
+# pulldown_sample directories
+DIR_PULL_MACS := pulldown/macs2_peaks
+
+# pulldown_compare directories
+DIR_PULL_CSAW := pulldown/csaw
+
+# classification directories
+DIR_CLASS_SIMPLE := classifications/simple
+DIR_CLASS_SAMPLE := classifications/sample
+DIR_CLASS_COMPARE := classifications/comparison
+
+# summary directories
+DIR_SUM_FIGURES := summary/figures
+DIR_SUM_REPORTS := summary/reports
+DIR_SUM_TABLES := summary/tables
+
+# RData directories
+DIR_RDATA := RData
+
+################################################################################
+# Includes
+include config.mk
+
+################################################################################
+# track hub directory
+DIR_TRACK := $(PROJECT)_hub/$(GENOME)
+
+################################################################################
+# BEGIN RULES GENERATED FROM init.R ############################################
+################################################################################
+
+################################################################################
+# Workflow for bisulfite_align
+
+BISULFITE_ALIGN_PREFIXES := IDH2mut_1_mc_hmc_bisulfite IDH2mut_2_mc_hmc_bisulfite NBM_1_mc_hmc_bisulfite NBM_2_mc_hmc_bisulfite
+########################################
+
+.PHONY : bisulfite_align
+bisulfite_align :	 $(patsubst %,$(DIR_BIS_RAW_FASTQCS)/%_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_BIS_TRIM_FASTQS)/%_trimmed.fq.gz,$(BISULFITE_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_BIS_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bam,$(BISULFITE_ALIGN_PREFIXES)) \
+					$(DIR_MULTIQC)/bisulfite_align/multiqc_report.html
+
+########################################
+.PHONY : bisulfite_raw_fastqc
+bisulfite_raw_fastqc : $(patsubst %,$(DIR_BIS_RAW_FASTQCS)/%_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES))
+
+$(DIR_BIS_RAW_FASTQCS)/%_fastqc.zip :
+	$(PATH_TO_FASTQC) --format fastq --noextract --outdir $(@D) $(DIR_BIS_RAW_FASTQS)/$*.fastq.gz
+
+########################################
+.PHONY : bisulfite_trim
+bisulfite_trim : $(patsubst %,$(DIR_BIS_TRIM_FASTQS)/%_trimmed.fq.gz,$(BISULFITE_ALIGN_PREFIXES))
+
+# Rule for trim_galore
+$(DIR_BIS_TRIM_FASTQS)/%_trimmed.fq.gz :
+	$(PATH_TO_TRIMGALORE) $(OPTS_TRIMGALORE_BISULFITE) --output_dir $(@D) $(DIR_BIS_RAW_FASTQS)/$*.fastq.gz
+
+########################################
+.PHONY : bisulfite_trim_fastqc
+bisulfite_trim_fastqc : $(patsubst %,$(DIR_BIS_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES))
+
+# Rule for FastQC on trimmed
+$(DIR_BIS_TRIM_FASTQCS)/%_trimmed_fastqc.zip : $(DIR_BIS_TRIM_FASTQS)/%_trimmed.fq.gz
+	$(PATH_TO_FASTQC) --format fastq --noextract --outdir $(@D) $<
+
+########################################
+.PHONY : bisulfite_bismark
+bisulfite_bismark : $(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bam,$(BISULFITE_ALIGN_PREFIXES))
+
+# Rule for bismark alignment
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bam : $(DIR_BIS_TRIM_FASTQS)/%_trimmed.fq.gz
+	$(PATH_TO_BISMARK) $(OPTS_BISMARK) --output_dir $(@D) --temp_dir $(@D) $<
+	$(PATH_TO_SAMTOOLS) sort -o $@ $@
+	$(PATH_TO_SAMTOOLS) index $@
+
+########################################
+# Rule to do multiqc on the bisulfite_align results
+.PHONY : bisulfite_align_multiqc
+bisulfite_align_multiqc : $(DIR_MULTIQC)/bisulfite_align/multiqc_report.html
+
+$(DIR_MULTIQC)/bisulfite_align/multiqc_report.html :	 $(patsubst %,$(DIR_BIS_RAW_FASTQCS)/%_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES)) \
+												$(patsubst %,$(DIR_BIS_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(BISULFITE_ALIGN_PREFIXES)) \
+												$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bam,$(BISULFITE_ALIGN_PREFIXES))
+	$(PATH_TO_MULTIQC) --force ./bisulfite --outdir $(@D)
+
+################################################################################
+
+
+################################################################################
+# Workflow for pulldown_align
+
+PULLDOWN_ALIGN_PREFIXES := IDH2mut_1_hmc_pulldown IDH2mut_2_hmc_pulldown IDH2mut_1_hmc_input_pulldown IDH2mut_2_hmc_input_pulldown NBM_1_hmc_pulldown NBM_2_hmc_pulldown NBM_1_hmc_input_pulldown NBM_2_hmc_input_pulldown
+
+########################################
+
+.PHONY : pulldown_align
+pulldown_align :	$(patsubst %,$(DIR_PULL_RAW_FASTQCS)/%_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_TRIM_FASTQS)/%_trimmed.fq.gz,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_BOWTIE2)/%_trimmed.fq.gz_aligned.bam,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_COVERAGES)/%_coverage_merged.bdg,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_TRACK)/%_coverage.bw,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(DIR_MULTIQC)/pulldown/multiqc_report.html
+
+########################################
+.PHONY : pulldown_raw_fastqc
+pulldown_raw_fastqc : $(patsubst %,$(DIR_PULL_RAW_FASTQCS)/%_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES))
+
+# Rule for FastQC on raw
+$(DIR_PULL_RAW_FASTQCS)/%_fastqc.zip :
+	$(PATH_TO_FASTQC) --format fastq --noextract --outdir $(@D) $(DIR_PULL_RAW_FASTQS)/$*.fastq.gz
+
+########################################
+.PHONY : pulldown_trim
+pulldown_trim : $(patsubst %,$(DIR_PULL_TRIM_FASTQS)/%_trimmed.fq.gz,$(PULLDOWN_ALIGN_PREFIXES))
+
+# Rule for trim_galore
+$(DIR_PULL_TRIM_FASTQS)/%_trimmed.fq.gz :
+	$(PATH_TO_TRIMGALORE) $(OPTS_TRIMGALORE_PULLDOWN) --output_dir $(@D) $(DIR_PULL_RAW_FASTQS)/$*.fastq.gz
+
+########################################
+.PHONY : pulldown_trim_fastqc
+pulldown_trim_fastqc : $(patsubst %,$(DIR_PULL_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES))
+
+# Rule for FastQC on trimmed
+$(DIR_PULL_TRIM_FASTQCS)/%_trimmed_fastqc.zip : $(DIR_PULL_TRIM_FASTQS)/%_trimmed.fq.gz
+	$(PATH_TO_FASTQC) --format fastq --noextract --outdir $(@D) $<
+
+########################################
+.PHONY : pulldown_bowtie2
+pulldown_bowtie2 : $(patsubst %,$(DIR_PULL_BOWTIE2)/%_trimmed.fq.gz_aligned.bam,$(PULLDOWN_ALIGN_PREFIXES))
+
+# Rule for bowtie2 alignment
+$(DIR_PULL_BOWTIE2)/%_trimmed.fq.gz_aligned.bam : $(DIR_PULL_TRIM_FASTQS)/%_trimmed.fq.gz $(DIR_PULL_TRIM_FASTQCS)/%_trimmed_fastqc.zip
+	$(PATH_TO_BOWTIE2) $(OPTS_BOWTIE2) $< 2> $(@D)/$(@F).txt | $(PATH_TO_SAMTOOLS) view -bS - > $@
+	$(PATH_TO_SAMTOOLS) sort -o $@ $@
+	$(PATH_TO_SAMTOOLS) index $@
+
+########################################
+.PHONY : pulldown_coverage
+pulldown_coverage : $(patsubst %,$(DIR_PULL_COVERAGES)/%_coverage_merged.bdg,$(PULLDOWN_ALIGN_PREFIXES)) \
+					$(patsubst %,$(DIR_TRACK)/%_coverage.bw,$(PULLDOWN_ALIGN_PREFIXES))
+
+# Rule for coverage bedGraph
+.INTERMEDIATE : $(DIR_PULL_COVERAGES)/%_coverage.bdg
+$(DIR_PULL_COVERAGES)/%_coverage.bdg : $(DIR_PULL_BOWTIE2)/%_trimmed.fq.gz_aligned.bam
+	$(PATH_TO_BEDTOOLS) genomecov -bg -g $(CHROM_PATH) -ibam $< | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rule for UCSC bigWig track
+$(DIR_TRACK)/%_coverage.bw : $(DIR_PULL_COVERAGES)/%_coverage.bdg
+	$(PATH_TO_BDG2BW) $< $(CHROM_PATH) $@
+
+# Rule for merged coverage BED
+# For use in signal BEDs downstream
+$(DIR_PULL_COVERAGES)/%_coverage_merged.bdg : $(DIR_PULL_COVERAGES)/%_coverage.bdg
+	$(PATH_TO_BEDTOOLS) merge -d 20 -i $< | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+########################################
+# Rule to do multiqc on the pulldown_align results
+.PHONY : pulldown_multiqc
+pulldown_multiqc : $(DIR_MULTIQC)/pulldown/multiqc_report.html
+
+$(DIR_MULTIQC)/pulldown/multiqc_report.html :	 $(patsubst %,$(DIR_PULL_RAW_FASTQCS)/%_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES)) \
+												$(patsubst %,$(DIR_PULL_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(PULLDOWN_ALIGN_PREFIXES)) \
+												$(patsubst %,$(DIR_PULL_BOWTIE2)/%_trimmed.fq.gz_aligned.bam,$(PULLDOWN_ALIGN_PREFIXES))
+	$(PATH_TO_MULTIQC) --force ./pulldown --outdir $(@D)
+
+################################################################################
+
+
+################################################################################
+# Workflow for bisulfite_sample
+
+BISULFITE_SAMPLE_PREFIXES := IDH2mut_1_mc_hmc_bisulfite IDH2mut_2_mc_hmc_bisulfite NBM_1_mc_hmc_bisulfite NBM_2_mc_hmc_bisulfite
+BISFULITE_SAMPLE_CLEAN_TMP := $(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph,$(BISULFITE_SAMPLE_PREFIXES))
+
+########################################
+
+.PHONY : bisulfite_sample
+bisulfite_sample :	$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph.gz,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report.txt.gz,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_RDATA)/%_trimmed_bismark_annotatr_analysis.RData,$(BISULFITE_SAMPLE_PREFIXES))\
+					$(patsubst %,$(DIR_TRACK)/%_trimmed_bismark_bt2.bw,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_CLASS_SIMPLE)/%_bismark_simple_classification.bed,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_RDATA)/%_bismark_simple_classification_annotatr_analysis.RData,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_TRACK)/%_bismark_simple_classification.bb,$(BISULFITE_SAMPLE_PREFIXES)) \
+					$(DIR_MULTIQC)/bisulfite_sample/multiqc_report.html
+
+########################################
+.PHONY : bisulfite_extractor
+bisulfite_extractor :	 $(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph.gz,$(BISULFITE_SAMPLE_PREFIXES)) \
+						$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov.gz,$(BISULFITE_SAMPLE_PREFIXES)) \
+						$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report.txt.gz,$(BISULFITE_SAMPLE_PREFIXES)) \
+						$(patsubst %,$(DIR_RDATA)/%_trimmed_bismark_annotatr_analysis.RData,$(BISULFITE_SAMPLE_PREFIXES))\
+						$(patsubst %,$(DIR_TRACK)/%_trimmed_bismark_bt2.bw,$(BISULFITE_SAMPLE_PREFIXES)) \
+
+# Rule for bismark methylation extractor
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov.gz $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph.gz $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report.txt.gz : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bam
+	cd $(DIR_BIS_BISMARK); \
+	$(PATH_TO_EXTRACTOR) $(OPTS_EXTRACTOR) $(<F)
+
+# Rule for temporary extractor results for annotatr
+# NOTE: bismark.cov.gz file is 1-based start and end, need to subtract
+# 1 from start in order for annotatr to properly interpret it
+.INTERMEDIATE : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov.gz
+	gunzip -c $< | $(PATH_TO_AWK) -v OFS="\t" '{print $$1, $$2 - 1, $$3, ".", $$4, ".", $$5 + $$6}' > $@
+
+# Rule for annotatr of extractor results
+$(DIR_RDATA)/%_trimmed_bismark_annotatr_analysis.RData : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bismark.cov
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type bismark --group1 NULL --group0 NULL
+
+# Rule for temporary unzipping of extractor bedGraph
+.INTERMEDIATE : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph.gz
+	gunzip -c $< | $(PATH_TO_AWK) 'NR > 1 {print $$0}' | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rules for UCSC bigWig track of extractor
+$(DIR_TRACK)/%_trimmed_bismark_bt2.bw : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph
+	$(PATH_TO_BDG2BW) $< $(CHROM_PATH) $@
+
+########################################
+.PHONY : bisulfite_simple_classification
+bisulfite_simple_classification :	 $(patsubst %,$(DIR_CLASS_SIMPLE)/%_bisulfite_bismark_simple_classification.bed,$(BISULFITE_SAMPLE_PREFIXES)) \
+									$(patsubst %,$(DIR_RDATA)/%_bismark_simple_classification_annotatr_analysis.RData,$(BISULFITE_SAMPLE_PREFIXES)) \
+									$(patsubst %,$(DIR_TRACK)/%_bismark_simple_classification.bb,$(BISULFITE_SAMPLE_PREFIXES)) \
+
+# Simple classification for percent methylation
+$(DIR_CLASS_SIMPLE)/%_bisulfite_bismark_simple_classification.bed : $(DIR_BIS_BISMARK)/%_bisulfite_trimmed_bismark_bt2.bedGraph.gz
+	$(PATH_TO_R) ../../scripts/classify_simple.R --project $(PROJECT) --inFile $< --outFile $@ --group1 NULL --group0 NULL
+
+# Rule for annotatr of simple classification
+$(DIR_RDATA)/%_bisulfite_bismark_simple_classification_annotatr_analysis.RData : $(DIR_CLASS_SIMPLE)/%_bisulfite_bismark_simple_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type simple_bisulfite_bismark --group1 NULL --group0 NULL
+
+# Rule for UCSC bigBed track of simple classifiation
+$(DIR_TRACK)/%_bisulfite_bismark_simple_classification.bb : $(DIR_CLASS_SIMPLE)/%_bisulfite_bismark_simple_classification.bed
+	$(PATH_TO_BED2BB) $< $(CHROM_PATH) $@
+
+########################################
+# Rule to do multiqc on the bisulfite_sample results
+.PHONY : bisulfite_sample_multiqc
+bisulfite_sample_multiqc : $(DIR_MULTIQC)/bisulfite_sample/multiqc_report.html
+
+$(DIR_MULTIQC)/bisulfite_sample/multiqc_report.html :	 $(patsubst %,$(DIR_BIS_RAW_FASTQCS)/%_fastqc.zip,$(BISULFITE_SAMPLE_PREFIXES)) \
+												$(patsubst %,$(DIR_BIS_TRIM_FASTQCS)/%_trimmed_fastqc.zip,$(BISULFITE_SAMPLE_PREFIXES)) \
+												$(patsubst %,$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.bedGraph.gz,$(BISULFITE_SAMPLE_PREFIXES))
+	$(PATH_TO_MULTIQC) --force ./bisulfite --outdir $(@D)
+
+########################################
+# Rule to delete all temporary files from make bis_sample
+.PHONY : clean_bisulfite_sample_tmp
+clean_bisulfite_sample_tmp :
+	rm -f $(BISFULITE_SAMPLE_CLEAN_TMP)
+
+################################################################################
+
+
+################################################################################
+# Workflow for pulldown_sample
+
+PULLDOWN_SAMPLE_PREFIXES := IDH2mut_1_hmc_pulldown IDH2mut_2_hmc_pulldown NBM_1_hmc_pulldown NBM_2_hmc_pulldown
+########################################
+
+.PHONY : pulldown_sample
+pulldown_sample :	 $(patsubst %,$(DIR_PULL_MACS)/%_macs2_peaks.narrowPeak,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_MACS)/%_macs2_model.r,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_MACS)/%_macs2_model.pdf,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_RDATA)/%_macs2_annotatr_analysis.RData,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_CLASS_SIMPLE)/%_macs2_simple_classification.bed,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_RDATA)/%_macs2_simple_classification_annotatr_analysis.RData,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_TRACK)/%_macs2_simple_classification.bb,$(PULLDOWN_SAMPLE_PREFIXES))
+
+########################################
+.PHONY : pulldown_macs2
+pulldown_macs2 :	 $(patsubst %,$(DIR_PULL_MACS)/%_macs2_peaks.narrowPeak,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_MACS)/%_macs2_model.r,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_PULL_MACS)/%_macs2_model.pdf,$(PULLDOWN_SAMPLE_PREFIXES)) \
+					$(patsubst %,$(DIR_RDATA)/%_macs2_annotatr_analysis.RData,$(PULLDOWN_SAMPLE_PREFIXES)) \
+
+# Rule for macs2 peaks
+$(DIR_PULL_MACS)/%_pulldown_macs2_peaks.narrowPeak $(DIR_PULL_MACS)/%_pulldown_macs2_model.r :	 $(DIR_PULL_BOWTIE2)/%_pulldown_trimmed.fq.gz_aligned.bam \
+														$(DIR_PULL_BOWTIE2)/%_input_pulldown_trimmed.fq.gz_aligned.bam
+	$(PATH_TO_MACS) callpeak -t $(word 1, $^) -c $(word 2, $^) -f BAM --name $(patsubst %_peaks.narrowPeak,%,$(@F)) --outdir $(@D) $(OPTS_MACS)
+
+# Rule for macs2 model
+$(DIR_PULL_MACS)/%_pulldown_macs2_model.pdf : $(DIR_PULL_MACS)/%_pulldown_macs2_model.r
+	cd $(DIR_PULL_MACS); \
+	Rscript $(<F)
+
+# Rule for annotatr of macs2 narrowPeak
+$(DIR_RDATA)/%_pulldown_macs2_annotatr_analysis.RData : $(DIR_PULL_MACS)/%_pulldown_macs2_peaks.narrowPeak
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type macs2 --group1 NULL --group0 NULL
+
+########################################
+.PHONY : pulldown_simple_classification
+pulldown_simple_classification :	 $(patsubst %,$(DIR_CLASS_SIMPLE)/%_macs2_simple_classification.bed,$(PULLDOWN_SAMPLE_PREFIXES)) \
+									$(patsubst %,$(DIR_RDATA)/%_macs2_simple_classification_annotatr_analysis.RData,$(PULLDOWN_SAMPLE_PREFIXES)) \
+									$(patsubst %,$(DIR_TRACK)/%_macs2_simple_classification.bb,$(PULLDOWN_SAMPLE_PREFIXES))
+
+# Rule for simple classification of macs2 peaks
+$(DIR_CLASS_SIMPLE)/%_pulldown_macs2_simple_classification.bed : $(DIR_PULL_MACS)/%_pulldown_macs2_peaks.narrowPeak
+	$(PATH_TO_R) ../../scripts/classify_simple.R --project $(PROJECT) --inFile $< --outFile $@ --group1 NULL --group0 NULL
+
+# Rule for annotatr of simple classification
+$(DIR_RDATA)/%_pulldown_macs2_simple_classification_annotatr_analysis.RData : $(DIR_CLASS_SIMPLE)/%_pulldown_macs2_simple_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type simple_pulldown_macs2 --group1 NULL --group0 NULL
+
+# Rule for UCSC bigBed track of simple classifiation
+$(DIR_TRACK)/%_pulldown_macs2_simple_classification.bb : $(DIR_CLASS_SIMPLE)/%_pulldown_macs2_simple_classification.bed
+	$(PATH_TO_BED2BB) $< $(CHROM_PATH) $@
+
+################################################################################
+
+
+################################################################################
+# Workflow for sample_classification
+SAMPLE_CLASS_PREFIXES := IDH2mut_1 IDH2mut_2 NBM_1 NBM_2
+
+# Master rule
+.PHONY : sample_classification
+sample_classification :	 $(patsubst %,$(DIR_TRACK)/%_sample_classification.bb,$(SAMPLE_CLASS_PREFIXES)) \
+		$(patsubst %,$(DIR_RDATA)/%_sample_classification_annotatr_analysis.RData,$(SAMPLE_CLASS_PREFIXES)) \
+		$(patsubst %,$(DIR_CLASS_SAMPLE)/%_sample_classification.bed,$(SAMPLE_CLASS_PREFIXES))
+
+# Rule for sample classification bigBed
+$(DIR_TRACK)/%_sample_classification.bb : $(DIR_CLASS_SAMPLE)/%_sample_classification.bed
+	$(PATH_TO_BED2BB) $^ $(CHROM_PATH) $@
+
+# Rule for annotatr of sample classification
+$(DIR_RDATA)/%_sample_classification_annotatr_analysis.RData : $(DIR_CLASS_SAMPLE)/%_sample_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type sample_class --group1 NULL --group0 NULL
+
+# Classification BED
+$(DIR_CLASS_SAMPLE)/%_sample_classification.bed :	 $(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_highmeth.txt \
+								$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_lowmeth.txt \
+								$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_signal.txt \
+								$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_nosignal.txt \
+								$(DIR_PULL_MACS)/%_hmc_pulldown_peak.txt \
+								$(DIR_PULL_MACS)/%_hmc_pulldown_nopeak_signal.txt \
+								$(DIR_PULL_MACS)/%_hmc_pulldown_nopeak_nosignal.txt
+	bash ../../scripts/classify_hybrid_sample.sh $(PATH_TO_BEDTOOLS) $(PATH_TO_AWK) $(CHROM_PATH) $@ $^
+
+
+.INTERMEDIATE : $(DIR_BIS_BISMARK)/%_bisulfite_trimmed_bismark_bt2.CpG_report.txt
+$(DIR_BIS_BISMARK)/%_bisulfite_trimmed_bismark_bt2.CpG_report.txt : $(DIR_BIS_BISMARK)/%_bisulfite_trimmed_bismark_bt2.CpG_report.txt.gz
+	gunzip -c $< > $@
+
+# Intermediates for the bisulfite piece
+$(DIR_BIS_BISMARK)/%_bisulfite_highmeth_tmp.txt $(DIR_BIS_BISMARK)/%_bisulfite_lowmeth_tmp.txt $(DIR_BIS_BISMARK)/%_bisulfite_nometh_signal_tmp.txt $(DIR_BIS_BISMARK)/%_bisulfite_nometh_nosignal_tmp.txt : $(DIR_BIS_BISMARK)/%_bisulfite_trimmed_bismark_bt2.CpG_report.txt
+	$(PATH_TO_AWK) -v MIN_COV=$(OPT_MIN_COV) -f ../../scripts/classify_prepare_bisulfite_sample.awk $<
+
+# Sort the bisulfite pieces (NOTE: They are in a slightly different order from pulldown results)
+$(DIR_BIS_BISMARK)/%_bisulfite_highmeth.txt : $(DIR_BIS_BISMARK)/%_bisulfite_highmeth_tmp.txt
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $< > $@
+
+$(DIR_BIS_BISMARK)/%_bisulfite_lowmeth.txt : $(DIR_BIS_BISMARK)/%_bisulfite_lowmeth_tmp.txt
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $< > $@
+
+$(DIR_BIS_BISMARK)/%_bisulfite_nometh_signal.txt : $(DIR_BIS_BISMARK)/%_bisulfite_nometh_signal_tmp.txt
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $< > $@
+
+$(DIR_BIS_BISMARK)/%_bisulfite_nometh_nosignal.txt : $(DIR_BIS_BISMARK)/%_bisulfite_nometh_nosignal_tmp.txt
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $< > $@
+
+
+# Intermediates for the pulldown piece
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_peak.txt
+$(DIR_PULL_MACS)/%_pulldown_peak.txt : $(DIR_PULL_MACS)/%_pulldown_macs2_peaks.narrowPeak
+	$(PATH_TO_AWK) -v OFS="\t" '{print $$1, $$2, $$3}' $< \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_nopeak.txt
+$(DIR_PULL_MACS)/%_pulldown_nopeak.txt : $(DIR_PULL_MACS)/%_pulldown_peak.txt
+	$(PATH_TO_BEDTOOLS) complement -g <(sort -T $(DIR_TMP) -k1,1 $(CHROM_PATH)) -i $< \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	| $(PATH_TO_AWK) -v OFS="\t" '$$2 != $$3 {print $$0}' \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_signal.txt
+$(DIR_PULL_MACS)/%_pulldown_signal.txt : $(DIR_PULL_COVERAGES)/%_input_pulldown_coverage_merged.bdg
+	cp $< $@
+
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_nosignal.txt
+$(DIR_PULL_MACS)/%_pulldown_nosignal.txt : $(DIR_PULL_MACS)/%_pulldown_signal.txt
+	$(PATH_TO_BEDTOOLS) complement -g <(sort -T $(DIR_TMP) -k1,1 $(CHROM_PATH)) -i $< \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	| $(PATH_TO_AWK) -v OFS="\t" '$$2 != $$3 {print $$0}' \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_nopeak_signal.txt
+$(DIR_PULL_MACS)/%_pulldown_nopeak_signal.txt : $(DIR_PULL_MACS)/%_pulldown_nopeak.txt $(DIR_PULL_MACS)/%_pulldown_signal.txt
+	$(PATH_TO_BEDTOOLS) intersect -a $(word 1, $^) -b $(word 2, $^) \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_MACS)/%_pulldown_nopeak_nosignal.txt
+$(DIR_PULL_MACS)/%_pulldown_nopeak_nosignal.txt : $(DIR_PULL_MACS)/%_pulldown_nopeak.txt $(DIR_PULL_MACS)/%_pulldown_nosignal.txt
+	$(PATH_TO_BEDTOOLS) intersect -a $(word 1, $^) -b $(word 2, $^) \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	> $@
+
+
+# Clean temporary files that make does not clean up
+SAMPLE_CLASS_CLEAN_TMP := $(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_highmeth.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_lowmeth.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_signal.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_nosignal.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_MACS)/%_hmc_pulldown_peak.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_MACS)/%_hmc_pulldown_nopeak_signal.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_MACS)/%_hmc_pulldown_nopeak_nosignal.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_highmeth_tmp.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_lowmeth_tmp.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_signal_tmp.txt,$(SAMPLE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_BISMARK)/%_mc_hmc_bisulfite_nometh_nosignal_tmp.txt,$(SAMPLE_CLASS_PREFIXES))
+
+.PHONY : clean_sample_classification_tmp
+clean_sample_classification_tmp :
+	rm -f $(SAMPLE_CLASS_CLEAN_TMP)
+
+################################################################################
+
+## 2020-09-03 MDP:
+## This is the segment of the mint pipeline makefile that launches the WGBS differential
+## methylation analysis using the BioConductor DSS package. This is where I will
+## need to modify some parameters such that the two samples from the fictional 3rd
+## patient get added to make the test_hybrid_small demo data run
+## Specifically, bisulfite_compare_2, which is for the pairwise
+## Sample comparison is what needs to be modified, I believe that the
+## First one is fine as is
+
+################################################################################
+# Workflow for bisulfite_compare
+
+########################################
+
+.PHONY : bisulfite_compare
+bisulfite_compare : bisulfite_compare_1 bisulfite_compare_2
+
+########################################
+# Workflow for bisulfite_compare_1
+
+BISULFITE_COMPARE_1_PREREQS := $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_significant.txt $(DIR_RDATA)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_annotatr_analysis.RData $(DIR_TRACK)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss.bw
+BISULFITE_COMPARE_1_CYTFILES := $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+BISULFITE_COMPARE_1_SAMPLEIDS := IDH2mut_1_mc_hmc_bisulfite,IDH2mut_2_mc_hmc_bisulfite,NBM_1_mc_hmc_bisulfite,NBM_2_mc_hmc_bisulfite
+BISULFITE_COMPARE_1_GROUPS := 1,1,0,0
+BISULFITE_COMPARE_1_COMPARISON := IDH2mut_v_NBM_mc_hmc_bisulfite
+BISULFITE_COMPARE_1_CLEAN_TMP := $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+
+########################################
+.PHONY : bisulfite_compare_1
+bisulfite_compare_1 : $(BISULFITE_COMPARE_1_PREREQS)
+
+# Rule for dss input of bismark CpG report
+.INTERMEDIATE : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report_for_dss.txt
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report_for_dss.txt : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report.txt.gz
+	$(PATH_TO_AWK) -v OFS="\t" -v MIN_COV=$(OPT_MIN_COV) '$$4 + $$5 >= MIN_COV {print $$1, $$2, $$3, $$4 + $$5, $$4}' <(gunzip -c $<) | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rule for dss
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_significant.txt : $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+	$(PATH_TO_R) ../../scripts/dss_run.R --project $(PROJECT) --genome $(GENOME) --files $(BISULFITE_COMPARE_1_CYTFILES) --samplenames $(BISULFITE_COMPARE_1_SAMPLEIDS) --model ~1+group --groups $(BISULFITE_COMPARE_1_GROUPS) --contrast 0,1 --covariates NA --covIsNumeric 0 --interpretation NBM,IDH2mut --outprefix $(BISULFITE_COMPARE_1_COMPARISON) $(OPTS_DSS_IDH2mut_v_NBM_mc_hmc_bisulfite)
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_bigWig.bedGraph : $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_significant.txt
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_annotatr.txt : $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_significant.txt
+
+# Rule for annotatr of dss filtered results
+$(DIR_RDATA)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_annotatr_analysis.RData : $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type dss --group1 $(GROUP1_NAME_1) --group0 $(GROUP0_NAME_1)
+
+# Rule to sort bedGraph to match CHROM_PATH sorting
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_bigWig_sorted.bedGraph : $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_bigWig.bedGraph
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $^ > $@
+
+# Rule for UCSC bigWig of filtered dss_bedgraph_sorted results
+$(DIR_TRACK)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss.bw : $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_bigWig_sorted.bedGraph
+	$(PATH_TO_BDG2BW) $^ $(CHROM_PATH) $@
+
+########################################
+# Rule to delete all temporary files from make bisulfite_compare_1
+BISULFITE_COMPARE_1_CLEAN_TMP := $(DIR_BIS_DSS)/IDH2mut_v_NBM_mc_hmc_bisulfite_dss_for_annotatr.txt
+
+.PHONY : clean_bisulfite_compare_tmp_1
+clean_bisulfite_compare_tmp_1 :
+				rm -f $(BISULFITE_COMPARE_1_CLEAN_TMP)
+## 2020-09-03 MDP:
+## 
+##
+##
+##
+##
+##
+##
+
+########################################
+# Workflow for bisulfite_compare_2
+
+BISULFITE_COMPARE_2_PREREQS := $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_significant.txt $(DIR_RDATA)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_annotatr_analysis.RData $(DIR_TRACK)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss.bw
+BISULFITE_COMPARE_2_CYTFILES := $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt,$(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+BISULFITE_COMPARE_2_SAMPLEIDS := IDH2mut_1_mc_hmc_bisulfite,IDH2mut_2_mc_hmc_bisulfite,NBM_1_mc_hmc_bisulfite,NBM_2_mc_hmc_bisulfite
+BISULFITE_COMPARE_2_GROUPS := 1,1,0,0
+BISULFITE_COMPARE_2_COMPARISON := IDH2mut_v_NBM_paired_mc_hmc_bisulfite
+BISULFITE_COMPARE_2_CLEAN_TMP := $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+
+########################################
+.PHONY : bisulfite_compare_2
+bisulfite_compare_2 : $(BISULFITE_COMPARE_2_PREREQS)
+
+# Rule for dss input of bismark CpG report
+.INTERMEDIATE : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report_for_dss.txt
+$(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report_for_dss.txt : $(DIR_BIS_BISMARK)/%_trimmed_bismark_bt2.CpG_report.txt.gz
+	$(PATH_TO_AWK) -v OFS="\t" -v MIN_COV=$(OPT_MIN_COV) '$$4 + $$5 >= MIN_COV {print $$1, $$2, $$3, $$4 + $$5, $$4}' <(gunzip -c $<) | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rule for dss
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_significant.txt : $(DIR_BIS_BISMARK)/IDH2mut_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/IDH2mut_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_1_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt $(DIR_BIS_BISMARK)/NBM_2_mc_hmc_bisulfite_trimmed_bismark_bt2.CpG_report_for_dss.txt
+	$(PATH_TO_R) ../../scripts/dss_run.R --project $(PROJECT) --genome $(GENOME) --files $(BISULFITE_COMPARE_2_CYTFILES) --samplenames $(BISULFITE_COMPARE_2_SAMPLEIDS) --model ~1+group+subject --groups $(BISULFITE_COMPARE_2_GROUPS) --contrast 0,1,0 --covariates subject:1,2,1,2 --covIsNumeric 0 --interpretation NBM,IDH2mut --outprefix $(BISULFITE_COMPARE_2_COMPARISON) $(OPTS_DSS_IDH2mut_v_NBM_paired_mc_hmc_bisulfite)
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_bigWig.bedGraph : $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_significant.txt
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_annotatr.txt : $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_significant.txt
+
+# Rule for annotatr of dss filtered results
+$(DIR_RDATA)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_annotatr_analysis.RData : $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type dss --group1 $(GROUP1_NAME_2) --group0 $(GROUP0_NAME_2)
+
+# Rule to sort bedGraph to match CHROM_PATH sorting
+$(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_bigWig_sorted.bedGraph : $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_bigWig.bedGraph
+	sort -T $(DIR_TMP) -k1,1 -k2,2n $^ > $@
+
+# Rule for UCSC bigWig of filtered dss_bedgraph_sorted results
+$(DIR_TRACK)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss.bw : $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_bigWig_sorted.bedGraph
+	$(PATH_TO_BDG2BW) $^ $(CHROM_PATH) $@
+
+########################################
+# Rule to delete all temporary files from make bisulfite_compare_2
+BISULFITE_COMPARE_2_CLEAN_TMP := $(DIR_BIS_DSS)/IDH2mut_v_NBM_paired_mc_hmc_bisulfite_dss_for_annotatr.txt
+
+.PHONY : clean_bisulfite_compare_tmp_2
+clean_bisulfite_compare_tmp_2 :
+				rm -f $(BISULFITE_COMPARE_2_CLEAN_TMP)
+
+
+########################################
+# Rule to delete all temporary files from make bisulfite_compare
+.PHONY : clean_bisulfite_compare_tmp
+clean_bisulfite_compare_tmp : clean_bisulfite_compare_tmp_1
+clean_bisulfite_compare_tmp : clean_bisulfite_compare_tmp_2
+
+################################################################################
+
+
+################################################################################
+# Workflow for pulldown_compare
+
+########################################
+
+.PHONY : pulldown_compare
+pulldown_compare : pulldown_compare_1 pulldown_compare_simple_classification_1 pulldown_compare_2 pulldown_compare_simple_classification_2
+
+########################################
+# Workflow for pulldown_compare_1
+
+PULLDOWN_COMPARE_1_PREREQS := $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_significant.txt $(DIR_TRACK)/IDH2mut_v_NBM_hmc_pulldown_csaw_peaks.bb $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_merged_signal.bed $(DIR_RDATA)/IDH2mut_v_NBM_hmc_pulldown_csaw_annotatr_analysis.RData
+PULLDOWN_COMPARE_SIMPLE_1_PREREQS := $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bed $(DIR_TRACK)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bb $(DIR_RDATA)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification_annotatr_analysis.RData
+PULLDOWN_COMPARE_1_INPUT := $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam
+PULLDOWN_COMPARE_1_CHIP := $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_1_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_2_hmc_pulldown_trimmed.fq.gz_aligned.bam
+PULLDOWN_COMPARE_1_NAME := IDH2mut_v_NBM_hmc_pulldown
+PULLDOWN_COMPARE_1_CLEAN_TMP := $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_bigBed.bed
+
+########################################
+.PHONY : pulldown_compare_1
+pulldown_compare_1 : $(PULLDOWN_COMPARE_1_PREREQS)
+
+# Rule for csaw peaks
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_significant.txt : $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_1_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_2_hmc_pulldown_trimmed.fq.gz_aligned.bam
+	$(PATH_TO_R) ../../scripts/csaw_run.R --project test_hybrid_small --chipfiles $(PULLDOWN_COMPARE_1_CHIP) --inputfiles $(PULLDOWN_COMPARE_1_INPUT) --chipnames IDH2mut_1,IDH2mut_2,NBM_1,NBM_2 --useinput TRUE --model ~1+group --groups 1,1,0,0 --contrast 0,1 --covariates NA --covIsNumeric 0 --interpretation NBM,IDH2mut --quiet FALSE --outprefix $(PULLDOWN_COMPARE_1_NAME) $(OPTS_CSAW_IDH2mut_v_NBM_hmc_pulldown)
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_annotatr.txt : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_significant.txt
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_bigBed.bed : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_significant.txt
+
+# Rule for annotatr of csaw peaks
+$(DIR_RDATA)/IDH2mut_v_NBM_hmc_pulldown_csaw_annotatr_analysis.RData : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type csaw --group1 $(CHIP1_NAME_1) --group0 $(CHIP0_NAME_1)
+
+# Rule to merge input signals from the two groups
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_merged_signal.bed : $(DIR_PULL_COVERAGES)/IDH2mut_1_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/IDH2mut_2_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/NBM_1_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/NBM_2_hmc_input_pulldown_coverage_merged.bdg
+	cat $^ | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge -d 20 | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rule for UCSC bigBed track of csaw peaks
+$(DIR_TRACK)/IDH2mut_v_NBM_hmc_pulldown_csaw_peaks.bb : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_bigBed.bed
+	$(PATH_TO_BED2BB) $^ $(CHROM_PATH) $@
+
+########################################
+.PHONY : pulldown_compare_simple_classification_1
+pulldown_compare_simple_classification_1 : $(PULLDOWN_COMPARE_SIMPLE_1_PREREQS)
+
+# Rule for simple classification of combined csaw peaks
+$(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bed : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_hmc_pulldown_csaw_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/classify_simple.R --project $(PROJECT) --inFile $< --outFile $@ --group1 $(CHIP1_NAME_1) --group0 $(CHIP0_NAME_1)
+
+# Rule for annotatr of csaw simple classifications
+$(DIR_RDATA)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification_annotatr_analysis.RData : $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type simple_pulldown_csaw --group1 $(CHIP1_NAME_1) --group0 $(CHIP0_NAME_1)
+
+# Rule for UCSC bigBed track
+$(DIR_TRACK)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bb : $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_hmc_pulldown_csaw_simple_classification.bed
+	$(PATH_TO_BED2BB) $< $(CHROM_PATH) $@
+
+########################################
+# Rule to delete all temporary files from make pulldown_compare_1
+.PHONY : clean_pulldown_compare_tmp_1
+clean_pulldown_compare_tmp_1 :
+	rm -f $(PULLDOWN_COMPARE_1_CLEAN_TMP)
+########################################
+# Workflow for pulldown_compare_2
+
+PULLDOWN_COMPARE_2_PREREQS := $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_significant.txt $(DIR_TRACK)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_peaks.bb $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_merged_signal.bed $(DIR_RDATA)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_annotatr_analysis.RData
+PULLDOWN_COMPARE_SIMPLE_2_PREREQS := $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bed $(DIR_TRACK)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bb $(DIR_RDATA)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification_annotatr_analysis.RData
+PULLDOWN_COMPARE_2_INPUT := $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam
+PULLDOWN_COMPARE_2_CHIP := $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_1_hmc_pulldown_trimmed.fq.gz_aligned.bam,$(DIR_PULL_BOWTIE2)/NBM_2_hmc_pulldown_trimmed.fq.gz_aligned.bam
+PULLDOWN_COMPARE_2_NAME := IDH2mut_v_NBM_paired_hmc_pulldown
+PULLDOWN_COMPARE_2_CLEAN_TMP := $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_bigBed.bed
+
+########################################
+.PHONY : pulldown_compare_2
+pulldown_compare_2 : $(PULLDOWN_COMPARE_2_PREREQS)
+
+# Rule for csaw peaks
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_significant.txt : $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_1_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_2_hmc_input_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_1_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/IDH2mut_2_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_1_hmc_pulldown_trimmed.fq.gz_aligned.bam $(DIR_PULL_BOWTIE2)/NBM_2_hmc_pulldown_trimmed.fq.gz_aligned.bam
+	$(PATH_TO_R) ../../scripts/csaw_run.R --project test_hybrid_small --chipfiles $(PULLDOWN_COMPARE_2_CHIP) --inputfiles $(PULLDOWN_COMPARE_2_INPUT) --chipnames IDH2mut_1,IDH2mut_2,NBM_1,NBM_2 --useinput TRUE --model ~1+group+subject --groups 1,1,0,0 --contrast 0,1,0 --covariates subject:1,2,1,2 --covIsNumeric 0 --interpretation NBM,IDH2mut --quiet FALSE --outprefix $(PULLDOWN_COMPARE_2_NAME) $(OPTS_CSAW_IDH2mut_v_NBM_paired_hmc_pulldown)
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_annotatr.txt : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_significant.txt
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_bigBed.bed : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_significant.txt
+
+# Rule for annotatr of csaw peaks
+$(DIR_RDATA)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_annotatr_analysis.RData : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type csaw --group1 $(CHIP1_NAME_2) --group0 $(CHIP0_NAME_2)
+
+# Rule to merge input signals from the two groups
+$(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_merged_signal.bed : $(DIR_PULL_COVERAGES)/IDH2mut_1_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/IDH2mut_2_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/NBM_1_hmc_input_pulldown_coverage_merged.bdg $(DIR_PULL_COVERAGES)/NBM_2_hmc_input_pulldown_coverage_merged.bdg
+	cat $^ | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge -d 20 | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+# Rule for UCSC bigBed track of csaw peaks
+$(DIR_TRACK)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_peaks.bb : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_bigBed.bed
+	$(PATH_TO_BED2BB) $^ $(CHROM_PATH) $@
+
+########################################
+.PHONY : pulldown_compare_simple_classification_2
+pulldown_compare_simple_classification_2 : $(PULLDOWN_COMPARE_SIMPLE_2_PREREQS)
+
+# Rule for simple classification of combined csaw peaks
+$(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bed : $(DIR_PULL_CSAW)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_for_annotatr.txt
+	$(PATH_TO_R) ../../scripts/classify_simple.R --project $(PROJECT) --inFile $< --outFile $@ --group1 $(CHIP1_NAME_2) --group0 $(CHIP0_NAME_2)
+
+# Rule for annotatr of csaw simple classifications
+$(DIR_RDATA)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification_annotatr_analysis.RData : $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type simple_pulldown_csaw --group1 $(CHIP1_NAME_2) --group0 $(CHIP0_NAME_2)
+
+# Rule for UCSC bigBed track
+$(DIR_TRACK)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bb : $(DIR_CLASS_SIMPLE)/IDH2mut_v_NBM_paired_hmc_pulldown_csaw_simple_classification.bed
+	$(PATH_TO_BED2BB) $< $(CHROM_PATH) $@
+
+########################################
+# Rule to delete all temporary files from make pulldown_compare_2
+.PHONY : clean_pulldown_compare_tmp_2
+clean_pulldown_compare_tmp_2 :
+	rm -f $(PULLDOWN_COMPARE_2_CLEAN_TMP)
+
+########################################
+# Rule to delete all temporary files from make pulldown_compare
+.PHONY : clean_pulldown_compare_tmp
+clean_pulldown_compare_tmp : clean_pulldown_compare_tmp_1 clean_pulldown_compare_tmp_2
+
+################################################################################
+
+
+################################################################################
+# Workflow for compare_classification
+COMPARE_CLASS_PREFIXES := IDH2mut_v_NBM IDH2mut_v_NBM_paired
+
+# Master rule
+.PHONY : compare_classification
+compare_classification : $(patsubst %,$(DIR_TRACK)/%_compare_classification.bb,$(COMPARE_CLASS_PREFIXES)) \
+		$(patsubst %,$(DIR_RDATA)/%_compare_classification_annotatr_analysis.RData,$(COMPARE_CLASS_PREFIXES)) \
+		$(patsubst %,$(DIR_CLASS_COMPARE)/%_compare_classification.bed,$(COMPARE_CLASS_PREFIXES))
+
+# Rule for compare classification bigBed
+$(DIR_TRACK)/%_compare_classification.bb : $(DIR_CLASS_COMPARE)/%_compare_classification.bed
+	$(PATH_TO_BED2BB) $^ $(CHROM_PATH) $@
+
+# Rule for annotatr of compare classification
+$(DIR_RDATA)/%_compare_classification_annotatr_analysis.RData : $(DIR_CLASS_COMPARE)/%_compare_classification.bed
+	$(PATH_TO_R) ../../scripts/annotatr_annotations.R --file $< --genome $(GENOME) --annot_type compare_class --group1 NULL --group0 NULL
+
+# Classification BED
+.PRECIOUS : $(DIR_CLASS_COMPARE)/%_compare_classification.bed
+$(DIR_CLASS_COMPARE)/%_compare_classification.bed :	 $(DIR_BIS_DSS)/%_mc_hmc_bisulfite_DMup.txt \
+								$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_DMdown.txt \
+								$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_noDM_signal.txt \
+								$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_noDM_nosignal.txt \
+								$(DIR_PULL_CSAW)/%_hmc_pulldown_DMup.txt \
+								$(DIR_PULL_CSAW)/%_hmc_pulldown_DMdown.txt \
+								$(DIR_PULL_CSAW)/%_hmc_pulldown_noDM_signal.txt \
+								$(DIR_PULL_CSAW)/%_hmc_pulldown_noDM_nosignal.txt
+	bash ../../scripts/classify_compare.sh $(PATH_TO_BEDTOOLS) $(PATH_TO_AWK) $(CHROM_PATH) $@ $^
+
+
+# Intermediates for the bisulfite piece
+# Each needs 0-based start and 1-based end to match other files
+.INTERMEDIATE : $(DIR_BIS_DSS)/%_bisulfite_DMup.txt
+$(DIR_BIS_DSS)/%_bisulfite_DMup.txt : $(DIR_BIS_DSS)/%_bisulfite_dss_significant.txt
+	$(PATH_TO_AWK) -v OFS="\t" 'NR > 1 && $$7 >= 0 { print $$1, $$2 - 1, $$3 }' $< | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_BIS_DSS)/%_bisulfite_DMdown.txt
+$(DIR_BIS_DSS)/%_bisulfite_DMdown.txt : $(DIR_BIS_DSS)/%_bisulfite_dss_significant.txt
+	$(PATH_TO_AWK) -v OFS="\t" 'NR > 1 && $$7 < 0 { print $$1, $$2 - 1, $$3 }' $< | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_BIS_DSS)/%_bisulfite_noDM_signal.txt
+$(DIR_BIS_DSS)/%_bisulfite_noDM_signal.txt : $(DIR_BIS_DSS)/%_bisulfite_dss_all.txt $(DIR_BIS_DSS)/%_bisulfite_dss_significant.txt
+	$(PATH_TO_BEDTOOLS) intersect -a <($(PATH_TO_AWK) -v OFS="\t" 'NR > 1 { print $$1, $$2 - 1, $$3 }' $(word 1, $^)) -b <($(PATH_TO_AWK) -v OFS="\t" 'NR > 1 { print $$1, $$2 - 1, $$3 }' $(word 2, $^)) -v | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_BIS_DSS)/%_bisulfite_noDM_nosignal.txt
+$(DIR_BIS_DSS)/%_bisulfite_noDM_nosignal.txt : $(DIR_BIS_DSS)/%_bisulfite_dss_all.txt
+	$(PATH_TO_BEDTOOLS) complement -i <($(PATH_TO_AWK) -v OFS="\t" 'NR > 1 { print $$1, $$2 - 1, $$3 }' <(sort -T $(DIR_TMP) -k1,1 -k2,2n $<)) -g <(sort -T $(DIR_TMP) -k1,1 $(CHROM_PATH)) | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+
+# Intermediates for the pulldown piece
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_up.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_up.txt : $(DIR_PULL_CSAW)/%_pulldown_csaw_significant.txt
+	$(PATH_TO_AWK) -v OFS="\t" 'NR > 1 && $$8 >= 0 {print $$1, $$2, $$3}' $< \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_down.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_down.txt : $(DIR_PULL_CSAW)/%_pulldown_csaw_significant.txt
+	$(PATH_TO_AWK) -v OFS="\t" 'NR > 1 && $$8 < 0 {print $$1, $$2, $$3}' $< \
+	| sort -T $(DIR_TMP) -k1,1 -k2,2n \
+	> $@
+
+
+# Each needs 0-based start and 1-based end to match other files
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_DMup.txt
+$(DIR_PULL_CSAW)/%_pulldown_DMup.txt : $(DIR_PULL_CSAW)/%_pulldown_tmp_up.txt $(DIR_PULL_CSAW)/%_pulldown_tmp_down.txt
+	$(PATH_TO_BEDOPS) --difference $^ | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_DMdown.txt
+$(DIR_PULL_CSAW)/%_pulldown_DMdown.txt : $(DIR_PULL_CSAW)/%_pulldown_tmp_down.txt $(DIR_PULL_CSAW)/%_pulldown_tmp_up.txt
+	$(PATH_TO_BEDOPS) --difference $^ | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_DM.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_DM.txt : $(DIR_PULL_CSAW)/%_pulldown_DMup.txt $(DIR_PULL_CSAW)/%_pulldown_DMdown.txt
+	cat $^ | sort -T $(DIR_TMP) -k1,1 -k2,2n > $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_noDM.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_noDM.txt: $(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_DM.txt
+	$(PATH_TO_BEDTOOLS) complement -i $< -g <(sort -T $(DIR_TMP) -k1,1 $(CHROM_PATH)) \
+	| $(PATH_TO_AWK) -v OFS="\t" '$$2 != $$3 {print $$0}' \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_signal.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_signal.txt : $(DIR_PULL_CSAW)/%_pulldown_merged_signal.bed
+	cp $< $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_tmp_nosignal.txt
+$(DIR_PULL_CSAW)/%_pulldown_tmp_nosignal.txt : $(DIR_PULL_CSAW)/%_pulldown_tmp_signal.txt
+	$(PATH_TO_BEDTOOLS) complement -i $< -g <(sort -T $(DIR_TMP) -k1,1 $(CHROM_PATH)) \
+	| $(PATH_TO_AWK) -v OFS="\t" '$$2 != $$3 {print $$0}' \
+	> $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_noDM_signal.txt
+$(DIR_PULL_CSAW)/%_pulldown_noDM_signal.txt : $(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_noDM.txt $(DIR_PULL_CSAW)/%_pulldown_tmp_signal.txt
+	$(PATH_TO_BEDTOOLS) intersect -a $(word 1, $^) -b $(word 2, $^) | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+.INTERMEDIATE : $(DIR_PULL_CSAW)/%_pulldown_noDM_nosignal.txt
+$(DIR_PULL_CSAW)/%_pulldown_noDM_nosignal.txt : $(DIR_PULL_CSAW)/%_pulldown_tmp_disjoint_noDM.txt $(DIR_PULL_CSAW)/%_pulldown_tmp_nosignal.txt
+	$(PATH_TO_BEDTOOLS) intersect -a $(word 1, $^) -b $(word 2, $^) | sort -T $(DIR_TMP) -k1,1 -k2,2n | bedtools merge > $@
+
+
+# Clean temporary files that make does not clean up
+COMPARE_CLASS_CLEAN_TMP := $(patsubst %,$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_DMup.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_DMdown.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_noDM_signal.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_BIS_DSS)/%_mc_hmc_bisulfite_noDM_nosignal.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_CSAW)/%_hmc_pulldown_DMup.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_CSAW)/%_hmc_pulldown_DMdown.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_CSAW)/%_hmc_pulldown_noDM_signal.txt,$(COMPARE_CLASS_PREFIXES)) \
+								$(patsubst %,$(DIR_PULL_CSAW)/%_hmc_pulldown_noDM_nosignal.txt,$(COMPARE_CLASS_PREFIXES)) \
+
+.PHONY : clean_compare_classification_tmp
+clean_compare_classification_tmp :
+	rm -f $(COMPARE_CLASS_CLEAN_TMP)
+.PHONY : clean_tmp
+clean_tmp :  clean_bisulfite_align_tmp clean_pulldown_sample_tmp clean_sample_classification_tmp clean_bisulfite_compare_tmp clean_pulldown_compare_tmp clean_compare_classification_tmp
