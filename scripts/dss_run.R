@@ -195,10 +195,31 @@ message('Completed Constructing the design data.frame')
 ###
 ### Do the fit and test
 ###
+message('Starting DMLfit.multiFactor')
 
-fit = DMLfit.multiFactor(data, design = design, formula = as.formula(model))
+if(use_cov) {
+    # my modified version only for pair comparison
+    fit = DMLfit.multiFactor(data, design = design, ~ group + subject)
 
-result = DMLtest.multiFactor(fit, coef=coef)
+    message('Completed the fit, starting the DMLtest.multiFactor')
+
+    # After reading the DSS documentation on these two functions I realized that this
+    # version should work, and I believe maintain the original intention of the
+    # mint pipeline development team:
+    result = DMLtest.multiFactor(fit, term = "group")
+} else {
+    ## This is the unmodified code from the mint paper, and as far as I know, it does work
+    ## For the Group comparisons, however it did not work, for several reasons, for the
+    ## Pairwise comparisons
+
+    fit = DMLfit.multiFactor(data, design = design, formula = as.formula(model))
+
+    message('Completed the fit, starting the DMLtest.multiFactor')
+    result = DMLtest.multiFactor(fit, coef=coef)
+}
+
+message('Completed the test')
+
 
 if(tilewidth != 0) {
 	# If tiling, DSS ignores the fact that the ranges of the bsseq object are not CpGs
