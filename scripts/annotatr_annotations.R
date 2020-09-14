@@ -3,6 +3,10 @@ library(ggplot2)
 library(regioneR)
 library(optparse)
 
+proxy_url <- "marlowe-proxy:3128"
+# ftp_url <- "ftp://marlowe.cc.ucsf.edu:3128/"
+Sys.setenv(http_proxy = proxy_url, https_proxy = proxy_url, ftp_proxy = proxy_url)
+
 ################################################################################
 # Deal with command line options
 
