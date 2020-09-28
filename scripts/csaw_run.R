@@ -177,8 +177,8 @@ if(use_input) {
         scinfo <- scaleControlFilter(chip_binned, input_binned)
 
         # Now this "new" version of the filterWindows step seems to work properly: 
-        filter_stat = filterWindowsControl(chip, input, prior.count = prior.count, scale.info = scinfo)
-
+        ## filter_stat = filterWindowsControl(chip, input, prior.count = prior.count, scale.info = scinfo)
+        filter_stat = filterWindows(chip, input, type="control", prior.count = prior.count, scale.info = scinfo)
 	keep = (filter_stat$filter > log2(chipfold))
 	chip = chip[keep,]
 }
@@ -280,10 +280,10 @@ combined_tests$color = ifelse(combined_tests$logFC < 0, '0,0,255', '102,102,255'
 combined_gr = merged$region
 # The csaw package has changed and not all of these column field names are generated any longer
 # Some of them have been modified, so this step was causing an exception
-# mcols(combined_gr) = combined_tests[,c('nWindows', 'logFC.up', 'logFC.down', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
+mcols(combined_gr) = combined_tests[,c('nWindows', 'logFC.up', 'logFC.down', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
 
 # This is the new version of the combined_tests function call from AUG-2020 that now "works"
-mcols(combined_gr) = combined_tests[,c('num.tests', 'num.up.logFC', 'num.down.logFC', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
+# mcols(combined_gr) = combined_tests[,c('num.tests', 'num.up.logFC', 'num.down.logFC', 'logFC', 'direction', 'PValue', 'FDR', 'color')]
 
 # Convert to a data.frame and create the different variants
 combined_df = data.frame(combined_gr, stringsAsFactors=F)
